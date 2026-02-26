@@ -10,7 +10,7 @@
 :root{
 --bg1:#0f172a;
 --bg2:#1e3a8a;
---glass:rgba(15,23,42,.75);
+--glass:rgba(15,23,42,.85);
 --accent:#3b82f6;
 --text:#e2e8f0;
 --muted:#94a3b8;
@@ -30,7 +30,7 @@ overflow:hidden;
 
 .app{
 width:100%;
-max-width:1200px;
+max-width:1300px;
 height:100vh;
 display:flex;
 background:var(--glass);
@@ -43,20 +43,44 @@ border-right:1px solid rgba(255,255,255,.05);
 display:flex;
 flex-direction:column;
 padding:20px;
+transition:.3s;
+}
+
+.logo-row{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:20px;
 }
 
 .logo{
 font-weight:800;
-font-size:22px;
-margin-bottom:20px;
+font-size:20px;
 background:linear-gradient(90deg,#60a5fa,#3b82f6);
 -webkit-background-clip:text;
 -webkit-text-fill-color:transparent;
 }
 
+#logoutBtn{
+background:linear-gradient(45deg, red, lightcoral);
+border:none;
+padding:6px 14px;
+color:white;
+font-weight:600;
+border-radius:10px;
+cursor:pointer;
+transition:.3s;
+font-size:12px;
+}
+
+#logoutBtn:hover{
+transform:scale(1.07);
+box-shadow:0 0 12px rgba(255,0,0,.5);
+}
+
 .search{
 padding:10px;
-border-radius:12px;
+border-radius:10px;
 border:none;
 background:rgba(255,255,255,.05);
 color:white;
@@ -83,6 +107,15 @@ flex-direction:column;
 padding:15px;
 border-bottom:1px solid rgba(255,255,255,.05);
 font-weight:600;
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.back-btn{
+display:none;
+cursor:pointer;
+font-size:18px;
 }
 
 .messages{
@@ -95,7 +128,7 @@ gap:10px;
 }
 
 .msg{
-max-width:70%;
+max-width:75%;
 padding:10px 15px;
 border-radius:15px;
 font-size:14px;
@@ -143,8 +176,21 @@ text-decoration:none;
 }
 
 @media(max-width:768px){
-.sidebar{width:100%;position:absolute;height:100%;z-index:10;background:var(--glass);}
-.chat{width:100%;}
+.sidebar{
+position:absolute;
+height:100%;
+z-index:10;
+left:0;
+top:0;
+}
+
+.chat{
+width:100%;
+}
+
+.back-btn{
+display:block;
+}
 }
 </style>
 </head>
@@ -154,8 +200,8 @@ text-decoration:none;
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 const firebaseConfig={
 apiKey:"AIzaSyCGyal54VADYeaXYT82fD4dL7RJv_NjwYg",
@@ -170,10 +216,11 @@ const app=initializeApp(firebaseConfig);
 const auth=getAuth(app);
 const db=getFirestore(app);
 const provider=new GoogleAuthProvider();
-const root=document.getElementById("root");
 
 let currentUser=null;
 let currentChat=null;
+
+const root=document.getElementById("root");
 
 function parse(text){
 text=text.replace(/\\(.)/g,"$1");
@@ -186,10 +233,10 @@ return text;
 }
 
 function loginUI(){
-root.innerHTML=`<div class="app" style="justify-content:center;align-items:center;">
-<button id="login">Войти через Google</button>
+root.innerHTML=`
+<div class="app" style="justify-content:center;align-items:center;">
+<button onclick="window.location.reload()">Войти через Google</button>
 </div>`;
-document.getElementById("login").onclick=()=>signInWithRedirect(auth,provider);
 }
 
 async function mainUI(user){
@@ -200,13 +247,19 @@ uid:user.uid
 
 root.innerHTML=`
 <div class="app">
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
+<div class="logo-row">
 <div class="logo">Question SAY</div>
+<button id="logoutBtn">Выйти</button>
+</div>
 <input class="search" id="search" placeholder="Поиск пользователя...">
 <div id="users"></div>
 </div>
 <div class="chat">
-<div class="chat-header" id="chatName">Выберите чат</div>
+<div class="chat-header">
+<span class="back-btn" id="backBtn">←</span>
+<span id="chatName">Выберите чат</span>
+</div>
 <div class="messages" id="messages"></div>
 <div class="input-area">
 <input id="msgInput" placeholder="Сообщение...">
@@ -215,10 +268,14 @@ root.innerHTML=`
 </div>
 </div>`;
 
+document.getElementById("logoutBtn").onclick=async()=>{
+await signOut(auth);
+location.reload();
+};
+
 loadUsers("");
 
 document.getElementById("search").oninput=e=>loadUsers(e.target.value);
-
 document.getElementById("sendBtn").onclick=send;
 document.getElementById("msgInput").addEventListener("keypress",e=>{
 if(e.key==="Enter")send();
@@ -275,7 +332,7 @@ if(user){
 currentUser=user;
 mainUI(user);
 }else{
-loginUI();
+signInWithRedirect(auth,provider);
 }
 });
 </script>
