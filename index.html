@@ -317,25 +317,185 @@ box.scrollTop=box.scrollHeight;
 }
 
 async function send(){
-const input=document.getElementById("msgInput");
-if(!input.value||!currentChat)return;
-await addDoc(collection(db,"chats",currentChat,"messages"),{
-text:input.value,
-uid:currentUser.uid,
-createdAt:serverTimestamp()
-});
-input.value="";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  getRedirectResult,
+  onAuthStateChanged,
+  signOut,
+  setPersistence,
+  browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey:"AIzaSyCGyal54VADYeaXYT82fD4dL7RJv_NjwYg",
+  authDomain:"question-say.firebaseapp.com",
+  projectId:"question-say",
+  storageBucket:"question-say.firebasestorage.app",
+  messagingSenderId:"329304423311",
+  appId:"1:329304423311:web:71c83bc0e462682c5b69fa"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+await setPersistence(auth, browserLocalPersistence);
+
+let currentUser = null;
+let currentChat = null;
+
+const root = document.getElementById("root");
+
+function parse(text){
+  text=text.replace(/\\(.)/g,"$1");
+  text=text.replace(/\*\*\*(.*?)\*\*\*/g,"<b><i>$1</i></b>");
+  text=text.replace(/\*\*(.*?)\*\*/g,"<b>$1</b>");
+  text=text.replace(/\*(.*?)\*/g,"<i>$1</i>");
+  text=text.replace(/~(.*?)~/g,"<s>$1</s>");
+  text=text.replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank">$1</a>');
+  return text;
 }
 
-onAuthStateChanged(auth,user=>{
-if(user){
-currentUser=user;
-mainUI(user);
-}else{
-signInWithRedirect(auth,provider);
+function loginUI(){
+  root.innerHTML = `
+  <div class="app" style="justify-content:center;align-items:center;flex-direction:column;gap:20px;">
+    <div style="font-size:24px;font-weight:700;">Question SAY</div>
+    <button id="loginBtn">Войти через Google</button>
+  </div>`;
+
+  document.getElementById("loginBtn").onclick = () => {
+    signInWithRedirect(auth, provider);
+  };
 }
+
+async function mainUI(user){
+
+  await setDoc(doc(db,"users",user.uid),{
+    name:user.displayName,
+    uid:user.uid
+  },{merge:true});
+
+  root.innerHTML = `
+  <div class="app">
+    <div class="sidebar">
+      <div class="logo-row">
+        <div class="logo">Question SAY</div>
+        <button id="logoutBtn">Выйти</button>
+      </div>
+      <input class="search" id="search" placeholder="Поиск пользователя...">
+      <div id="users"></div>
+    </div>
+
+    <div class="chat">
+      <div class="chat-header">
+        <span id="chatName">Выберите чат</span>
+      </div>
+      <div class="messages" id="messages"></div>
+      <div class="input-area">
+        <input id="msgInput" placeholder="Сообщение...">
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById("logoutBtn").onclick = async () => {
+    await signOut(auth);
+  };
+
+  loadUsers("");
+
+  document.getElementById("search").oninput = e => loadUsers(e.target.value);
+  document.getElementById("sendBtn").onclick = send;
+  document.getElementById("msgInput").addEventListener("keypress",e=>{
+    if(e.key==="Enter") send();
+  });
+}
+
+async function loadUsers(filter){
+  const container = document.getElementById("users");
+  container.innerHTML="";
+  const snap = await getDocs(collection(db,"users"));
+  snap.forEach(d=>{
+    const u=d.data();
+    if(u.uid!==currentUser.uid &&
+       u.name.toLowerCase().includes(filter.toLowerCase())){
+      const div=document.createElement("div");
+      div.className="user-item";
+      div.textContent=u.name;
+      div.onclick=()=>openChat(u);
+      container.appendChild(div);
+    }
+  });
+}
+
+function openChat(user){
+  currentChat=[currentUser.uid,user.uid].sort().join("_");
+  document.getElementById("chatName").textContent=user.name;
+
+  const q=query(
+    collection(db,"chats",currentChat,"messages"),
+    orderBy("createdAt")
+  );
+
+  onSnapshot(q,snap=>{
+    const box=document.getElementById("messages");
+    box.innerHTML="";
+    snap.forEach(d=>{
+      const data=d.data();
+      const div=document.createElement("div");
+      div.className="msg "+(data.uid===currentUser.uid?"me":"other");
+      div.innerHTML=parse(data.text);
+      box.appendChild(div);
+    });
+    box.scrollTop=box.scrollHeight;
+  });
+}
+
+async function send(){
+  const input=document.getElementById("msgInput");
+  if(!input.value||!currentChat) return;
+
+  await addDoc(
+    collection(db,"chats",currentChat,"messages"),
+    {
+      text:input.value,
+      uid:currentUser.uid,
+      createdAt:serverTimestamp()
+    }
+  );
+
+  input.value="";
+}
+
+/* ------------------ ФИКС БЕСКОНЕЧНОГО ВХОДА ------------------ */
+
+getRedirectResult(auth).catch(console.error);
+
+onAuthStateChanged(auth,(user)=>{
+  if(user){
+    currentUser=user;
+    mainUI(user);
+  } else {
+    loginUI();
+  }
 });
 </script>
-
 </body>
 </html>
