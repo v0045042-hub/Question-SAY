@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Question SAY</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+:root{
+--blue-1:#0f172a;
+--blue-2:#1e3a8a;
+--blue-3:#3b82f6;
+--blue-4:#60a5fa;
+--text:#e2e8f0;
+--muted:#94a3b8;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
+
+body{
+height:100vh;
+background:radial-gradient(circle at 20% 20%,#1e3a8a 0%,#0f172a 40%,#020617 100%);
+display:flex;
+justify-content:center;
+align-items:center;
+color:var(--text);
+overflow:hidden;
+}
+
+.card{
+width:95%;
+max-width:1200px;
+height:92vh;
+background:rgba(15,23,42,0.7);
+backdrop-filter:blur(25px);
+border-radius:30px;
+display:flex;
+overflow:hidden;
+box-shadow:0 0 80px rgba(59,130,246,0.4);
+border:1px solid rgba(255,255,255,0.05);
+animation:fadeIn 1s ease;
+}
+
+.sidebar{
+width:280px;
+background:linear-gradient(180deg,rgba(30,58,138,0.5),rgba(15,23,42,0.8));
+padding:25px;
+display:flex;
+flex-direction:column;
+border-right:1px solid rgba(255,255,255,0.05);
+}
+
+.logo{
+font-size:22px;
+font-weight:800;
+letter-spacing:2px;
+background:linear-gradient(90deg,#60a5fa,#3b82f6);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+margin-bottom:20px;
+}
+
+.user-info{
+font-size:13px;
+color:var(--muted);
+margin-bottom:20px;
+}
+
+.chat-area{
+flex:1;
+display:flex;
+flex-direction:column;
+}
+
+.chat-header{
+padding:20px;
+font-weight:600;
+border-bottom:1px solid rgba(255,255,255,0.05);
+}
+
+.messages{
+flex:1;
+padding:25px;
+overflow-y:auto;
+display:flex;
+flex-direction:column;
+gap:14px;
+}
+
+.message{
+max-width:70%;
+padding:14px 18px;
+border-radius:20px;
+font-size:14px;
+animation:msg 0.25s ease;
+}
+
+.my{
+align-self:flex-end;
+background:linear-gradient(135deg,#2563eb,#1e40af);
+}
+
+.other{
+align-self:flex-start;
+background:rgba(255,255,255,0.05);
+}
+
+.meta{
+font-size:11px;
+color:var(--muted);
+margin-top:6px;
+text-align:right;
+}
+
+.input-area{
+display:flex;
+padding:20px;
+gap:15px;
+border-top:1px solid rgba(255,255,255,0.05);
+}
+
+input{
+flex:1;
+padding:14px 20px;
+border-radius:25px;
+border:none;
+outline:none;
+background:rgba(255,255,255,0.05);
+color:white;
+}
+
+button{
+padding:14px 22px;
+border:none;
+border-radius:25px;
+background:linear-gradient(135deg,#3b82f6,#2563eb);
+color:white;
+cursor:pointer;
+transition:0.3s;
+font-weight:500;
+}
+
+button:hover{
+transform:scale(1.05);
+box-shadow:0 0 15px #3b82f6;
+}
+
+.login{
+text-align:center;
+margin:auto;
+}
+
+@keyframes fadeIn{
+from{opacity:0;transform:scale(.95);}
+to{opacity:1;transform:scale(1);}
+}
+
+@keyframes msg{
+from{opacity:0;transform:translateY(8px);}
+to{opacity:1;transform:translateY(0);}
+}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+const firebaseConfig = {
+apiKey:"AIzaSyCGyal54VADYeaXYT82fD4dL7RJv_NjwYg",
+authDomain:"question-say.firebaseapp.com",
+projectId:"question-say",
+storageBucket:"question-say.firebasestorage.app",
+messagingSenderId:"329304423311",
+appId:"1:329304423311:web:71c83bc0e462682c5b69fa"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+const root = document.getElementById("app");
+
+function loginUI(){
+root.innerHTML = `
+<div class="card">
+<div class="login">
+<h1 class="logo">Question SAY</h1>
+<p style="color:#94a3b8;margin:15px 0;">Лучше чем Telegram</p>
+<button id="loginBtn">Войти через Google</button>
+</div>
+</div>`;
+document.getElementById("loginBtn").onclick=()=>signInWithPopup(auth,provider);
+}
+
+function chatUI(user){
+root.innerHTML=`
+<div class="card">
+<div class="sidebar">
+<div class="logo">Question SAY</div>
+<div class="user-info">${user.displayName}</div>
+</div>
+<div class="chat-area">
+<div class="chat-header">Global Chat</div>
+<div class="messages" id="messages"></div>
+<div class="input-area">
+<input id="msgInput" placeholder="Напиши сообщение..."/>
+<button id="sendBtn">Отправить</button>
+</div>
+</div>
+</div>`;
+
+const messagesDiv=document.getElementById("messages");
+const input=document.getElementById("msgInput");
+
+document.getElementById("sendBtn").onclick=send;
+input.addEventListener("keypress",e=>{if(e.key==="Enter")send();});
+
+const q=query(collection(db,"messages"),orderBy("createdAt"));
+onSnapshot(q,snap=>{
+messagesDiv.innerHTML="";
+snap.forEach(doc=>{
+const d=doc.data();
+const div=document.createElement("div");
+div.className="message "+(d.uid===user.uid?"my":"other");
+div.innerHTML=`
+<div>${d.text}</div>
+<div class="meta">${d.name} • ${d.createdAt?.toDate().toLocaleTimeString() || ""}</div>
+`;
+messagesDiv.appendChild(div);
+});
+messagesDiv.scrollTop=messagesDiv.scrollHeight;
+});
+
+async function send(){
+if(!input.value.trim())return;
+await addDoc(collection(db,"messages"),{
+text:input.value,
+uid:user.uid,
+name:user.displayName,
+createdAt:serverTimestamp()
+});
+input.value="";
+}
+}
+
+onAuthStateChanged(auth,user=>{
+if(user) chatUI(user);
+else loginUI();
+});
+</script>
+
+</body>
+</html>
